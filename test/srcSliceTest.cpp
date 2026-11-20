@@ -83,43 +83,8 @@ std::string StringsToArchive(std::vector<std::string> contents, std::vector<std:
 }
 
 std::string RunSrcSlice(std::string srcml, const TestArg& info) {
-    std::ostringstream output;
     SrcSliceHandler srcSliceHandler(srcml, info);
-    std::unordered_map<std::string, std::vector<SliceProfile>> profileMap = srcSliceHandler.GetProfileMap();
-
-    output << "{" << std::endl;
-    bool writtenSlices = false;
-
-    for (auto& profiles : profileMap) {
-        for (auto& slice : profiles.second) {
-            if (!slice.containsDeclaration)
-                continue;
-
-            slice.expandCalls = info.expandCalls;
-
-            writtenSlices = true;
-            // write out the start of the json object
-            std::string name(slice.variableName + '-' + slice.declPosition.ToNameString());
-
-            output << "\"" << name << "\":{" << std::endl;
-            output << slice;
-            output << "}," << std::endl;
-        }
-    }
-
-    // remove trailing comma
-    std::string stream2string = output.str();
-    output.clear();
-
-    // remove trailing comma
-    if (writtenSlices) {
-        stream2string.resize(stream2string.length() - 2);
-    }
-
-    // closing of the entire JSON object
-    stream2string += "\n}";
-
-    return stream2string;
+    return srcSliceHandler.ToJSON(true);
 }
 
 std::string FetchSlices(std::string cppSource) {

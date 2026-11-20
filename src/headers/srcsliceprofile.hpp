@@ -38,8 +38,10 @@ public:
     bool operator==(const SliceProfile& rhs) const;
     bool operator!=(const SliceProfile& rhs) const;
 
+    // default identifier for srcSlice output
     std::string jsonKey() const;
-    friend std::ostream& operator<<(std::ostream& out, SliceProfile& profile);
+    // identifier without the srcml unit hash (used in testing)
+    std::string shortKey() const;
 
     SlicePosition declPosition;
     std::string file;
@@ -76,11 +78,6 @@ public:
     std::set<std::pair<SlicePosition, SlicePosition>> controlEdges;
 
     bool visited = false;
-    bool updated = false;
-
-    // to be partial means this profile contains cfunction data
-    // that has not been fully resolved (unknown function decl)
-    bool partial = false;
     
     bool showControlEdges = false;
     bool expandCalls = false;

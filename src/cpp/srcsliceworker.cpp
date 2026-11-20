@@ -61,6 +61,8 @@ bool SrcSliceWorker::Finished() {
 
 //=======================================================================
 
+size_t SrcSliceOperations::str2hash(std::string value) { return std::hash<std::string>{}(value); } 
+
 std::string SrcSliceOperations::GenerateArrayType(std::string& typeString, int dim) {
     for (int i = 0; i < dim;++i) {
         typeString += "[]";
@@ -667,24 +669,20 @@ void SrcSliceOperations::ProcessExprStmt(Blob& data, const SliceCtx& sctx, const
 void SrcSliceOperations::CreateSliceCallData(Blob& data, [[maybe_unused]] const SliceCtx& sctx, const std::string& functionName,
                                             int argIndex, int argc, SlicePosition functionPosition,
                                             SliceProfile& sliceProfile, SlicePosition invokePosition) {
-    FunctionCallData sliceCallData = FunctionCallData(
-        functionName, // function call name
-        argIndex, // arg index starting from 1 to n
-        argc, // number of arguments within the call
-        functionPosition, // function definition position
-        invokePosition // line:col scope where the function call occurs
-    );
+    CallBlob callBlob = {
+        invokePosition,
+        functionPosition,
+        functionName,
+        (unsigned int)argIndex,
+        (unsigned int)argc
+    };
+    size_t blobHash = SrcSliceOperations::str2hash(callBlob.ToString());
+    data.callsMap[blobHash].push_back(callBlob);
+
+    FunctionCallData sliceCallData = FunctionCallData(blobHash);
 
     // push the cfunc data into the argument SliceProfile
     sliceProfile.cfunctions.insert(sliceCallData);
-
-    // prevent new call-data entering the sliceProfile from
-    // reverting the partial status
-    if (!sliceProfile.partial) {
-        // if we do not have a functions decl position label the profile as partial
-        // to attempt to resolve the call once more units are processed
-        sliceProfile.partial = !functionPosition.HasDefinition();
-    }
 
     // attempt to mark the cfunc towards the currentPointerReference
 

@@ -77,69 +77,22 @@ int main(int argc, char **argv)
         }
 
         SrcSliceHandler srcSliceHandler(info);
-
-        auto sliceProfileMap = srcSliceHandler.GetProfileMap();
-
-        std::ostringstream sliceOutput;
-
-        if (!outputFile.empty()) {
-            // allow output file to be written in
-            outFile = std::ofstream(outputFile);
-        } else {
-            // close output file
-            outFile.close();
-        }
-
-        // opening of the entire JSON object
-        sliceOutput << "{\n";
-        bool writtenSlices = false;
-
-        for (auto& profiles : sliceProfileMap) {
-            for (auto& slice : profiles.second) {
-                if (!slice.containsDeclaration)
-                    continue;
-
-                // if we need more call details in the call entries
-                // we need to set the respective bool true
-                slice.expandCalls = expandCalls;
-
-                writtenSlices = true;
-                std::string name(slice.variableName + '-' + slice.declPosition.ToNameString() + '-' + slice.checksum);
-
-                sliceOutput << "\"" << slice.jsonKey() << "\":{\n";
-                sliceOutput << slice;
-                sliceOutput << "},\n";
-            }
-        }
-
-        // remove trailing comma
-        std::string stream2string = sliceOutput.str();
-        sliceOutput.clear();
-
-        // remove trailing comma
-        if (writtenSlices) {
-            stream2string.resize(stream2string.length() - 2);
-        }
-
-        // closing of the entire JSON object
-        stream2string += "\n}";
+        std::string results = srcSliceHandler.ToJSON();
 
         // write to either stdout or output file
         if (!outputFile.empty()) {
+            // allow output file to be written in
+            outFile = std::ofstream(outputFile);
             std::cout << "Writing to :: " << outputFile << "\n";
-            outFile << stream2string;
+            outFile << results;
+            std::cout << "Output Saved to :: " << outputFile << "\n";
+            outFile.close();
         } else {
-            std::cout << stream2string;
+            // write to stdout
+            std::cout << results;
         }
     } catch (const std::exception& e) {
         std::cout << "\033[31m" << e.what() << "\033[0m" << "\n";
         return 3;
-    }
-
-    // ensure if we do have an output file we close it
-    // alert user that an output file has been created
-    if (!outputFile.empty()) {
-        std::cout << "Output Saved to :: " << outputFile << "\n";
-        outFile.close();
     }
 }

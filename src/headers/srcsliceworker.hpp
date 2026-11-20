@@ -60,6 +60,7 @@ struct Blob {
     std::vector<SlicePosition> elsedata;
 
     std::unordered_map<std::string, std::vector<FunctionSignatureData>> functionSigMap;
+    std::map<size_t, std::vector<CallBlob>> callsMap;
     
     // logic flags
     bool verboseMode = false;
@@ -164,6 +165,13 @@ namespace SrcSliceOperations {
     bool isLogical(const std::string& expr_op);
 
     bool isWhiteSpace(const std::string& str);
+
+
+    /**
+     * Converts a string into a size_t hash
+     * that can be used for look-ups
+     */
+    size_t str2hash(std::string value);
 };
 
 class SrcSliceWorker {

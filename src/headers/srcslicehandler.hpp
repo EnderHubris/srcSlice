@@ -90,8 +90,6 @@ public:
 
     void NotifyWrite(const srcDispatch::PolicyDispatcher *policy [[maybe_unused]], srcDispatch::srcSAXEventContext &ctx [[maybe_unused]]) {};
 
-    std::unordered_map<std::string, std::vector<SliceProfile>>& GetProfileMap();
-
     /*
         srcSlice focuses on Forward-Slicing, therefor our Control-Flows are going to be forward-flowing
         we are not focusing on backwards-flows.
@@ -112,14 +110,18 @@ public:
     void Stage3();
 
     void mergeFragments(std::vector<SliceProfile>& profiles);
-    void UpdateCalls(SliceProfile& sp);
+    void UpdateCalls(std::vector<CallBlob>& calls);
     void ResolveCalls(SliceProfile& sp);
 
     // thread target for managing SrcSliceWorker jobs
     void ManageThreads();
 
+    std::string Profile2Str(const SliceProfile& profile) const;
+    std::string ToJSON(bool strip_hash = false) const;
+
 private:
     std::unordered_map<std::string, std::vector<SliceProfile>> profileMap;
+    std::map<size_t, std::vector<CallBlob>> callsMap;
     std::unordered_set <std::string> visited_func;
 
     std::vector<SlicePosition> loopdata;

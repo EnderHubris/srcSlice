@@ -10,17 +10,18 @@
 #ifndef SRCSLICECOLLETION
 #define SRCSLICECOLLETION
 
-#include <exception>
-#include <unordered_map>
-#include <set>
-#include <memory>
-#include <any>
-#include <utility>
-#include <vector>
-#include <string>
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <vector>
+#include <string>
+#include <unordered_map>
+#include <functional>
+#include <utility>
+#include <memory>
+#include <any>
+#include <set>
+#include <exception>
 
 #include <srcSAXHandler.hpp>
 #include <srcDispatcher.hpp>
@@ -113,6 +114,24 @@ public:
     bool isDefined;
 };
 
+struct CallBlob {
+    SlicePosition invokePosition;
+    SlicePosition funcPos;
+    std::string functionName;
+    unsigned int parameterIndex;
+    unsigned int argumentCount;
+
+    std::string ToString() const {
+        std::ostringstream os;
+        os << functionName << "_"
+        << invokePosition.StartToString() << "_"
+        << parameterIndex << "_"
+        << argumentCount << "_"
+        << funcPos.StartToString();
+        return os.str();
+    }
+};
+
 // Store meta-data about a function-call by tracking:
 // name of the function being called, line where the call is made, index of the parameter,
 // and the line where the function is potentially defined
@@ -120,11 +139,7 @@ class FunctionCallData {
 public:
     FunctionCallData(){}
     FunctionCallData(
-        std::string funcName,
-        unsigned int paramIndex,
-        unsigned int argc,
-        SlicePosition funcPos,
-        SlicePosition invokePos,
+        size_t dataHash,
         bool ignore_ = false
     );
 
@@ -138,16 +153,11 @@ public:
     bool operator<(const FunctionCallData& rhs) const;
     bool operator>(const FunctionCallData& rhs) const;
 
-    // for debugging
-    friend std::ostream& operator<<(std::ostream& outStream, const FunctionCallData& data);
+    
+    size_t callKey; // std::hash of the string representation of CallBlob
 
-    SlicePosition invokePosition;
-    SlicePosition funcPos;
-    // hidden metadata to tell InterProcedural to not process this cfunctions element
+    // general metadata not displayed to the user
     bool ignore = false;
-    std::string functionName;
-    unsigned int parameterIndex;
-    unsigned int argumentCount;
 };
 
 #endif

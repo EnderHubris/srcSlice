@@ -208,6 +208,8 @@ size_t FindContextBlock(SlicePosition& sline, std::vector<SlicePosition>& group)
     return ctxIndex;
 };
 
+
+
 FunctionSignatureData::FunctionSignatureData(
     srcDispatch::DeltaElement<std::shared_ptr<srcDispatch::FunctionData>>& func,
     std::string className, bool blockDefined, const SliceCtx& ctx) {
@@ -223,45 +225,29 @@ FunctionSignatureData::FunctionSignatureData(
     isDefined = blockDefined;
 }
 
+
+
 FunctionCallData::FunctionCallData(
-    std::string funcName,
-    unsigned int paramIndex,
-    unsigned int argc,
-    SlicePosition funcPos,
-    SlicePosition invokePos,
+    size_t dataHash,
     bool ignore_
-): functionName(funcName), parameterIndex(paramIndex),
-funcPos(funcPos), invokePosition(invokePos),
-argumentCount(argc), ignore(ignore_) {};
+): callKey(dataHash), ignore(ignore_) {};
 
 FunctionCallData::FunctionCallData(const FunctionCallData& rhs) {
-    functionName = rhs.functionName;
-    invokePosition = rhs.invokePosition;
-    parameterIndex = rhs.parameterIndex;
-    argumentCount = rhs.argumentCount;
-    funcPos = rhs.funcPos;
+    callKey = rhs.callKey;
     ignore = rhs.ignore;
 };
 
 FunctionCallData& FunctionCallData::operator=(const FunctionCallData& rhs) {
     if (this == &rhs) return *this;
 
-    functionName = rhs.functionName;
-    invokePosition = rhs.invokePosition;
-    parameterIndex = rhs.parameterIndex;
-    argumentCount = rhs.argumentCount;
-    funcPos = rhs.funcPos;
+    callKey = rhs.callKey;
     ignore = rhs.ignore;
 
     return *this;
 }
 
 bool FunctionCallData::operator==(const FunctionCallData& rhs) const {
-    if (functionName != rhs.functionName) return false;
-    if (invokePosition != rhs.invokePosition) return false;
-    if (parameterIndex != rhs.parameterIndex) return false;
-    if (argumentCount != rhs.argumentCount) return false;
-    if (funcPos != rhs.funcPos) return false;
+    if (callKey != rhs.callKey) return false;
     return true;
 }
 bool FunctionCallData::operator!=(const FunctionCallData& rhs) const {
@@ -269,16 +255,8 @@ bool FunctionCallData::operator!=(const FunctionCallData& rhs) const {
 }
 
 bool FunctionCallData::operator<(const FunctionCallData& rhs) const {
-    if (functionName != rhs.functionName)
-        return functionName < rhs.functionName;
-    if (invokePosition != rhs.invokePosition)
-        return invokePosition < rhs.invokePosition;
-    if (argumentCount != rhs.argumentCount)
-        return argumentCount < rhs.argumentCount;
-    if (parameterIndex != rhs.parameterIndex)
-        return parameterIndex < rhs.parameterIndex;
-    if (funcPos != rhs.funcPos)
-        return funcPos < rhs.funcPos;
+    if (callKey != rhs.callKey)
+        return callKey < rhs.callKey;
         
     return false;
 }
@@ -286,11 +264,7 @@ bool FunctionCallData::operator>(const FunctionCallData& rhs) const {
     return rhs < *this;
 }
 
-std::ostream& operator<<(std::ostream& outStream, const FunctionCallData& data) {
-    outStream << "[" << data.functionName << " | " << data.parameterIndex
-    << " | " << data.funcPos.StartToString() << " | " << data.invokePosition.StartToString() << "]";
-    return outStream;
-}
+
 
 SliceCtx::SliceCtx(const srcDispatch::srcSAXEventContext& ctx) {
     defined = true;

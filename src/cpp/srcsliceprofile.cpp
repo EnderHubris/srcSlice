@@ -57,8 +57,6 @@ SliceProfile::SliceProfile(const SliceProfile& rhs) {
     controlEdges = rhs.controlEdges;
 
     visited = rhs.visited;
-    updated = rhs.updated;
-    partial = rhs.partial;
 
     showControlEdges = rhs.showControlEdges;
     expandCalls = rhs.expandCalls;
@@ -97,7 +95,6 @@ bool SliceProfile::operator==(const SliceProfile& rhs) const {
     if (cfunctions != rhs.cfunctions) return false;
     if (endOfScope != rhs.endOfScope) return false;
     if (visited != rhs.visited) return false;
-    if (updated != rhs.updated) return false;
     if (showControlEdges != rhs.showControlEdges) return false;
     if (currentPointerReference != rhs.currentPointerReference) return false;
     if (isPotentialArray != rhs.isPotentialArray) return false;
@@ -109,114 +106,6 @@ bool SliceProfile::operator==(const SliceProfile& rhs) const {
 }
 bool SliceProfile::operator!=(const SliceProfile& rhs) const {
     return !(*this == rhs);
-}
-
-std::ostream& operator<<(std::ostream& out, SliceProfile& profile) {
-    out << "    \"file\":\"" << profile.file << "\"," << "\n";
-    out << "    \"language\":\"" << profile.language << "\"," << "\n";
-    
-    out << "    \"namespace\":[";
-    bool first = true;
-    for (std::string& nameSpace : profile.containingNameSpaces) {
-        if (!first) {
-            out << ",";
-        }
-        out << "\"" << nameSpace.substr(0, nameSpace.find(' ')) << "\"";
-        first = false;
-    }
-    out << "]," << "\n";
-
-    out << "    \"class\":\"" << profile.nameOfContainingClass << "\"," << "\n";
-    out << "    \"function\":\"" << profile.function << "\"," << "\n";
-    out << "    \"type\":\"" << profile.variableType << "\"," << "\n";
-    out << "    \"name\":\"" << profile.variableName << "\"," << "\n";
-    
-    out << "    \"decl\":" << profile.declPosition.StartToString() << "," << "\n";
-
-    out << "    \"dependence\":[";
-    first = true;
-    for (auto dvar : profile.dvars) {
-        if (!first) {
-            out << ",";
-        }
-        out << "{\"" << dvar.first << "\":" << dvar.second.StartToString() << "}";
-        first = false;
-    }
-    out << "]," << "\n";
-
-    out << "    \"aliases\":[";
-    first = true;
-    for (auto alias : profile.aliases) {
-        if (!first) {
-            out << ",";
-        }
-        out << "{\"" << alias.first << "\":" << alias.second.StartToString() << "}";
-        first = false;
-    }
-    out << "]," << "\n";
-
-    out << "    \"calls\":[";
-    first = true;
-    for (auto cfunc : profile.cfunctions) {
-        if (!first) {
-            out << ",";
-        }
-        out << "{" <<
-                    "\"functionName\":\"" << cfunc.functionName;
-                    if (profile.expandCalls) {}
-                    out << "\",\"parameter\":\"" << cfunc.parameterIndex;
-                    out << "\",\"definitionPosition\":" << cfunc.funcPos.StartToString();
-                    if (profile.expandCalls) {
-                        out << ",\"endOfFunction\":" << cfunc.funcPos.EndToString();
-                    }
-                    out << ",\"invoke\":" << cfunc.invokePosition.StartToString() <<
-                "}";
-        first = false;
-    }
-    out << "]," << "\n";
-
-    // "use": [ { "start": "2:10", "end": "2:17" }, ... ]
-    out << "    \"use\":[";
-    first = true;
-    for (auto use : profile.uses) {
-        if (!first) {
-            out << ",";
-        }
-        out << use.StartToString();
-        first = false;
-    }
-    out << "]," << "\n";
-
-    // "definition": [ { "start": "2:10", "end": "2:17" }, ... ]
-    out << "    \"definition\":[";
-    first = true;
-    for (auto def : profile.definitions) {
-        if (!first) {
-            out << ",";
-        }
-        out << def.StartToString();
-        first = false;
-    }
-
-    if (profile.showControlEdges) {
-        out << "]," << "\n";
-
-        out << "    \"controlEdges\":[";
-        first = true;
-        for (auto edge : profile.controlEdges) {
-            if (!first) {
-                out << ",";
-            }
-            out << "[" << edge.first.StartToString() <<
-            "," << edge.second.StartToString() << "]";
-            first = false;
-        }
-        out << "]" << "\n";
-    } else {
-        out << "]" << "\n";
-    }
-
-    return out;
 }
 
 void SliceProfile::merge(SliceProfile& other) {
@@ -260,4 +149,7 @@ bool SliceProfile::inScope(const SlicePosition& pos) {
 
 std::string SliceProfile::jsonKey() const {
     return variableName + '-' + declPosition.ToNameString() + '-' + checksum;
+}
+std::string SliceProfile::shortKey() const {
+    return variableName + '-' + declPosition.ToNameString();
 }

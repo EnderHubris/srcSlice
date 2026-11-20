@@ -703,7 +703,7 @@ int main() {
     std::cout << OK << " Passed!" << std::endl;
 }
 
-TEST_CASE( TestName("Multi-file Test"), "[srcslice]" ) {
+TEST_CASE( TestName("Control-Edge (Multi-file) Test"), "[srcslice]" ) {
     std::cout << INFO << " Testing Multi-File Flows" << std::endl;
     json produced = json::parse(FetchSlices((std::vector<std::string>){
 R"(
@@ -717,44 +717,44 @@ int main() {
     foo(b);
 }
 )"
-    }, {"file.cpp","/utils/file2.cpp"}, data));
+    }, {"/utils/file.cpp","main.cpp"}, data));
 
     json expected = R"({
     "a-2-14":{
-        "file":"file.cpp",
+        "file":"/utils/file.cpp",
         "language":"C++",
         "namespace":[],
         "class":"",
         "function":"foo",
         "type":"int",
         "name":"a",
-        "decl":"file.cpp:2:14",
+        "decl":"/utils/file.cpp:2:14",
         "dependence":[],
         "aliases":[],
         "calls":[],
         "use":[],
-        "definition":["file.cpp:2:14","file.cpp:3:5"],
+        "definition":["/utils/file.cpp:2:14","/utils/file.cpp:3:5"],
         "controlEdges":[
-            ["file.cpp:2:14","file.cpp:3:5"]
+            ["/utils/file.cpp:2:14","/utils/file.cpp:3:5"]
         ]
     },
     "b-3-9":{
-        "file":"/utils/file2.cpp",
+        "file":"main.cpp",
         "language":"C++",
         "namespace":[],
         "class":"",
         "function":"main",
         "type":"int",
         "name":"b",
-        "decl":"/utils/file2.cpp:3:9",
+        "decl":"main.cpp:3:9",
         "dependence":[],
         "aliases":[],
-        "calls":[{"functionName":"foo","parameter":"1","definitionPosition":"file.cpp:2:1","invoke":"/utils/file2.cpp:4:5"}],
-        "use":["/utils/file2.cpp:4:9","file.cpp:2:14","file.cpp:3:5"],
-        "definition":["/utils/file2.cpp:3:9"],
+        "calls":[{"functionName":"foo","parameter":"1","definitionPosition":"/utils/file.cpp:2:1","invoke":"main.cpp:4:5"}],
+        "use":["main.cpp:4:9","/utils/file.cpp:2:14","/utils/file.cpp:3:5"],
+        "definition":["main.cpp:3:9"],
         "controlEdges":[
-            ["/utils/file2.cpp:3:9","/utils/file2.cpp:4:9"],
-            ["file.cpp:2:14","file.cpp:3:5"]
+            ["main.cpp:3:9","main.cpp:4:9"],
+            ["/utils/file.cpp:2:14","/utils/file.cpp:3:5"]
         ]
     }
     })"_json;
