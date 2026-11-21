@@ -24,50 +24,6 @@ SliceProfile::SliceProfile(
         dvars(dv), containsDeclaration(containsDecl), controlEdges(edges),
         visited(visit) {}
 
-SliceProfile::SliceProfile(const SliceProfile& rhs) {
-    declPosition = rhs.declPosition;
-    file = rhs.file;
-    function = rhs.function;
-    nameOfContainingClass = rhs.nameOfContainingClass;
-    containingNameSpaces = rhs.containingNameSpaces;
-    language = rhs.language;
-    checksum = rhs.checksum;
-    potentialAlias = rhs.potentialAlias;
-    dereferenced = rhs.dereferenced;
-
-    isGlobal = rhs.isGlobal;
-    classMemberVar = rhs.classMemberVar;
-    containsDeclaration = rhs.containsDeclaration;
-
-    isPointer = rhs.isPointer;
-    isReference = rhs.isReference;
-
-    variableName = rhs.variableName;
-    variableType = rhs.variableType;
-
-    definitions = rhs.definitions;
-    uses = rhs.uses;
-
-    dvars = rhs.dvars;
-    aliases = rhs.aliases;
-    cfunctions = rhs.cfunctions;
-
-    endOfScope = rhs.endOfScope;
-
-    controlEdges = rhs.controlEdges;
-
-    visited = rhs.visited;
-
-    showControlEdges = rhs.showControlEdges;
-    expandCalls = rhs.expandCalls;
-
-    currentPointerReference = rhs.currentPointerReference;
-    isPotentialArray = rhs.isPotentialArray;
-    ignorePtrRef = rhs.ignorePtrRef;
-    
-    isFragment = rhs.isFragment;
-}
-
 bool SliceProfile::operator==(const SliceProfile& rhs) const {
     if (this == &rhs) return true; // self-check protection
 

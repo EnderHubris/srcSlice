@@ -33,7 +33,10 @@ public:
             std::set<std::pair<SlicePosition, SlicePosition>> edges = {},
             bool containsDecl = false, bool visit = false);
 
-    SliceProfile(const SliceProfile& rhs);
+    SliceProfile(const SliceProfile&)               = default;
+    SliceProfile(SliceProfile&&)                    = default;
+    SliceProfile& operator=(const SliceProfile&)    = default;
+    SliceProfile& operator=(SliceProfile&&)         = default;
 
     bool operator==(const SliceProfile& rhs) const;
     bool operator!=(const SliceProfile& rhs) const;

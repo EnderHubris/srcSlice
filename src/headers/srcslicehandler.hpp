@@ -15,6 +15,7 @@
 #include <srcsliceparse.hpp>
 #include <srcsliceworker.hpp>
 
+#include <condition_variable>
 #include <mutex>
 #include <queue>
 
@@ -115,6 +116,9 @@ public:
 
     // thread target for managing SrcSliceWorker jobs
     void ManageThreads();
+    void replaceWorker(SrcSliceWorker** worker);
+    // merge the workers sub-structure into the main-structure in the handler
+    void consumeWorker(SrcSliceWorker* worker);
 
     std::string Profile2Str(const SliceProfile& profile) const;
     std::string ToJSON(bool strip_hash = false) const;
@@ -143,6 +147,10 @@ private:
     bool expandAliases = false;
 
     std::mutex backlogMutex;
+    std::condition_variable backlogCv;
+
+    std::mutex mergeMutex;
+
     int threadCount;
     std::queue<SrcSliceWorker*> backlog;
 

@@ -57,7 +57,10 @@ SrcSliceHandler::SrcSliceHandler(const CliInfo& info) {
 
         auto start = std::chrono::steady_clock::now();
         control.parse(&handler); // Start parsing
+        
         unitsScaned.store(true, std::memory_order_release);
+        { std::lock_guard<std::mutex> lk(backlogMutex); }
+        backlogCv.notify_all();
 
         if (t.joinable()) t.join();
 
@@ -83,6 +86,9 @@ SrcSliceHandler::SrcSliceHandler(const CliInfo& info) {
         control.parse(&handler); // Start parsing
 
         unitsScaned.store(true, std::memory_order_release);
+        { std::lock_guard<std::mutex> lk(backlogMutex); }
+        backlogCv.notify_all();
+
         if (t.joinable()) t.join();
 
         Stage2();
@@ -108,6 +114,9 @@ SrcSliceHandler::SrcSliceHandler(std::string& sourceCodeStr, const TestArg& info
     control.parse(&handler); // Start parsing
 
     unitsScaned.store(true, std::memory_order_release);
+    { std::lock_guard<std::mutex> lk(backlogMutex); }
+    backlogCv.notify_all();
+
     if (t.joinable()) t.join();
 
     Stage2();
@@ -131,150 +140,146 @@ void SrcSliceHandler::Notify(const srcDispatch::PolicyDispatcher *policy, const 
             fileDependencyTable[ctx.currentFilePath].push_back(includeData->path.ToString());
         }
 
-        // lock the backlog because main and p_thread access this queue obj
-        std::lock_guard<std::mutex> lock(backlogMutex);
-
-        // push worker into queue
-        backlog.push(
-            new SrcSliceWorker(unit, ctx, verboseMode, calculateControlEdges)
-        );
+        {
+            // lock the backlog because main and p_thread access this queue obj
+            std::lock_guard<std::mutex> lock(backlogMutex);
+    
+            // push worker into queue
+            backlog.push(
+                new SrcSliceWorker(unit, ctx, verboseMode, calculateControlEdges)
+            );
+        }
+        
+        backlogCv.notify_one();
     }
 }
+
+void SrcSliceHandler::consumeWorker(SrcSliceWorker* worker) {
+    if (worker == nullptr) return;
+    Blob& data = worker->data;
+
+    // manually move map entry values, merge will not merge if the keys between both maps exist
+    for (auto& profileGroup : data.profileMap) {
+        auto& dest = profileMap[profileGroup.first];
+        dest.insert(
+            dest.end(),
+            std::make_move_iterator(profileGroup.second.begin()),
+            std::make_move_iterator(profileGroup.second.end())
+        );
+    }
+
+    // manually move map entry values, merge will not merge if the keys between both maps exist
+    for (auto& funcSig : data.functionSigMap) {
+        auto& dest = functionSigMap[funcSig.first];
+        dest.insert(
+            dest.end(),
+            std::make_move_iterator(funcSig.second.begin()),
+            std::make_move_iterator(funcSig.second.end())
+        );
+    }
+
+    // all keys are expected to be unique
+    callsMap.merge(data.callsMap);
+    
+    // make_move_iterator prevents making copies
+    loopdata.insert(loopdata.end(),
+        std::make_move_iterator(data.loopdata.begin()),
+        std::make_move_iterator(data.loopdata.end())
+    );
+    forloopdata.insert(forloopdata.end(),
+        std::make_move_iterator(data.forloopdata.begin()),
+        std::make_move_iterator(data.forloopdata.end())
+    );
+    whileloopdata.insert(whileloopdata.end(),
+        std::make_move_iterator(data.whileloopdata.begin()),
+        std::make_move_iterator(data.whileloopdata.end())
+    );
+    dowhileloopdata.insert(dowhileloopdata.end(),
+        std::make_move_iterator(data.dowhileloopdata.begin()),
+        std::make_move_iterator(data.dowhileloopdata.end())
+    );
+    
+    ifdata.insert(ifdata.end(),
+        std::make_move_iterator(data.ifdata.begin()),
+        std::make_move_iterator(data.ifdata.end())
+    );
+    ifStmts.insert(ifStmts.end(),
+        std::make_move_iterator(data.ifStmts.begin()),
+        std::make_move_iterator(data.ifStmts.end())
+    );
+    elsedata.insert(elsedata.end(),
+        std::make_move_iterator(data.elsedata.begin()),
+        std::make_move_iterator(data.elsedata.end())
+    );
+    elseifdata.insert(elseifdata.end(),
+        std::make_move_iterator(data.elseifdata.begin()),
+        std::make_move_iterator(data.elseifdata.end())
+    );
+};
+
+void SrcSliceHandler::replaceWorker(SrcSliceWorker** worker) {
+    // in order for wait to use the lock it must be unique_lock
+    // to allow responsibility delegation
+    // lock_gaurds cannot be moved nor copied!!!
+    std::unique_lock<std::mutex> lock(backlogMutex);
+
+    // if (!backlog.empty()) {
+    //     if (backlog.front() != nullptr) {
+    //         // start worker
+    //         *worker = backlog.front();
+    //         (*worker)->Start();
+    //     }
+
+    //     // remove from backlog
+    //     backlog.pop();
+    // }
+
+    // wait for the backlogCv.notify_one() in Notify to ping
+    // this wait to continue execution to avoid race-conditions
+    backlogCv.wait(lock, [this] {
+        bool hasWork    = !backlog.empty();
+        bool scansFinished = unitsScaned.load(std::memory_order_acquire);
+        // when true stop waiting
+        return hasWork || scansFinished;
+    });
+
+    *worker = nullptr;
+    if (backlog.empty()) return;
+
+    *worker = backlog.front();
+    backlog.pop();
+};
 
 void SrcSliceHandler::ManageThreads() {
-    auto MergeStructures = [this](SrcSliceWorker* worker) {
-        if (worker == nullptr) return;
-        Blob& data = worker->data;
+    std::vector<std::thread> pool;
+    pool.reserve(threadCount);
 
-        // manually move map entry values, merge will not merge if the keys between both maps exist
-        for (auto& profileGroup : data.profileMap) {
-            auto& dest = profileMap[profileGroup.first];
-            dest.insert(
-                dest.end(),
-                std::make_move_iterator(profileGroup.second.begin()),
-                std::make_move_iterator(profileGroup.second.end())
-            );
-        }
+    for (int i = 0; i < threadCount; ++i) {
+        pool.emplace_back([this] {
+            // thread body (main)
+            SrcSliceWorker* w = nullptr;
+            for (;;) {
+                // ensures that if there are jobs in
+                // the backlog that theyre inserted
+                // in the pool and conpleted
+                replaceWorker(&w);
+                if (w == nullptr) return;
 
-        // manually move map entry values, merge will not merge if the keys between both maps exist
-        for (auto& funcSig : data.functionSigMap) {
-            auto& dest = functionSigMap[funcSig.first];
-            dest.insert(
-                dest.end(),
-                std::make_move_iterator(funcSig.second.begin()),
-                std::make_move_iterator(funcSig.second.end())
-            );
-        }
+                w->Perform();
 
-        // all keys are expected to be unique
-        callsMap.merge(data.callsMap);
-        
-        // make_move_iterator prevents making copies
-        loopdata.insert(loopdata.end(),
-            std::make_move_iterator(data.loopdata.begin()),
-            std::make_move_iterator(data.loopdata.end())
-        );
-        forloopdata.insert(forloopdata.end(),
-            std::make_move_iterator(data.forloopdata.begin()),
-            std::make_move_iterator(data.forloopdata.end())
-        );
-        whileloopdata.insert(whileloopdata.end(),
-            std::make_move_iterator(data.whileloopdata.begin()),
-            std::make_move_iterator(data.whileloopdata.end())
-        );
-        dowhileloopdata.insert(dowhileloopdata.end(),
-            std::make_move_iterator(data.dowhileloopdata.begin()),
-            std::make_move_iterator(data.dowhileloopdata.end())
-        );
-        
-        ifdata.insert(ifdata.end(),
-            std::make_move_iterator(data.ifdata.begin()),
-            std::make_move_iterator(data.ifdata.end())
-        );
-        ifStmts.insert(ifStmts.end(),
-            std::make_move_iterator(data.ifStmts.begin()),
-            std::make_move_iterator(data.ifStmts.end())
-        );
-        elsedata.insert(elsedata.end(),
-            std::make_move_iterator(data.elsedata.begin()),
-            std::make_move_iterator(data.elsedata.end())
-        );
-        elseifdata.insert(elseifdata.end(),
-            std::make_move_iterator(data.elseifdata.begin()),
-            std::make_move_iterator(data.elseifdata.end())
-        );
-
-        /*
-            while under the mutex lock:
-                - perform interprocedural against the shared structure
-                  after merging it with a sub-structure
-
-                - gather partial slices that later are dealt with via
-                  the second pass (finalize)
-        */
-    };
-
-    auto replaceWorker = [this](SrcSliceWorker** worker) {
-        // lock the backlog because main and p_thread access this queue obj
-        std::lock_guard<std::mutex> lock(backlogMutex);
-
-        if (!backlog.empty()) {
-            if (backlog.front() != nullptr) {
-                // start worker
-                *worker = backlog.front();
-                (*worker)->Start();
-            }
-
-            // remove from backlog
-            backlog.pop();
-        }
-    };
-    
-    std::vector<SrcSliceWorker*> workers(threadCount, nullptr);
-    bool runningJobs = true;
-
-    while (runningJobs) {
-        int activeJobs = 0;
-
-        for (int i = 0; i < threadCount; ++i) {
-            if (workers[i] != nullptr) {
-                if (workers[i]->Finished()) {
-                    workers[i]->WaitForJob();
-                    
-                    // merge worker blob into main structure
-                    MergeStructures(workers[i]);
-                    
-                    // replace worker with front of queue
-                    delete workers[i]; // deallocate SrcSliceWorker object
-                    workers[i] = nullptr;
-                } else {
-                    // job is active do not continue
-                    // the iteration and potentially replace this active worker
-                    ++activeJobs;
-                    continue;
+                {
+                    std::lock_guard<std::mutex> lk(mergeMutex);
+                    consumeWorker(w);
                 }
+                delete w;
             }
-
-            // pass pointer by reference so we can reassign its reference
-            replaceWorker(&workers[i]);
-
-            // replaced workers should be marked as an active job
-            if (workers[i] != nullptr) {
-                ++activeJobs;
-            }
-        }
-
-        // all jobs have been dispatched and completed
-        // and no jobs are active
-        bool allDone = unitsScaned.load(std::memory_order_acquire)
-                   && backlog.empty()
-                   && activeJobs == 0;
-
-        if (allDone) {
-            runningJobs = false;
-        }
+        });
     }
+
+    for (auto& job : pool) job.join();
 }
+
+
 
 std::string SrcSliceHandler::Profile2Str(const SliceProfile& profile) const {
     std::ostringstream out;
