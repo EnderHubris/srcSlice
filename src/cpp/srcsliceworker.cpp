@@ -677,7 +677,9 @@ void SrcSliceOperations::CreateSliceCallData(Blob& data, [[maybe_unused]] const 
         (unsigned int)argc
     };
     size_t blobHash = SrcSliceOperations::str2hash(callBlob.ToString());
-    data.callsMap[blobHash].push_back(callBlob);
+    auto& calls = data.callsMap[blobHash].calls;
+    calls.clear();
+    calls.push_back(std::move(callBlob));
 
     FunctionCallData sliceCallData = FunctionCallData(blobHash);
 

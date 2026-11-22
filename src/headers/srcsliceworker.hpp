@@ -17,6 +17,7 @@
 #include <chrono>
 #include <atomic>
 #include <thread>
+#include <optional>
 
 #include <exception>
 #include <unordered_map>
@@ -45,9 +46,17 @@ typedef srcDispatch::DeltaElement<std::shared_ptr<srcDispatch::BlockData>> Block
 typedef std::vector<srcDispatch::DeltaElement<std::shared_ptr<srcDispatch::FunctionData>>> Functions;
 typedef std::vector<srcDispatch::DeltaElement<std::shared_ptr<srcDispatch::ClassData>>> Classes;
 
+struct ParamSlice {
+    std::vector<CallBlob> calls;
+    std::vector<std::optional<
+        std::vector<SliceProfile>::iterator
+    >> paramSlices;
+};
+
 // sub-structure data that is later passed and unioned into the larger main structure
 struct Blob {
     std::unordered_map<std::string, std::vector<SliceProfile>> profileMap;
+    std::unordered_map<size_t, ParamSlice> callsMap;
 
     std::vector<SlicePosition> loopdata;
     std::vector<SlicePosition> forloopdata;
@@ -60,7 +69,6 @@ struct Blob {
     std::vector<SlicePosition> elsedata;
 
     std::unordered_map<std::string, std::vector<FunctionSignatureData>> functionSigMap;
-    std::map<size_t, std::vector<CallBlob>> callsMap;
     
     // logic flags
     bool verboseMode = false;

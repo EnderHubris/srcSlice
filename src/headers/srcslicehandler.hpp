@@ -77,6 +77,9 @@ struct TestArg {
     bool expandAliases;
 };
 
+inline size_t cacheMisses = 0;
+inline size_t cacheHits = 0;
+
 class SrcSliceHandler : public srcDispatch::PolicyListener {
 public:
     ~SrcSliceHandler();
@@ -106,6 +109,8 @@ public:
     // if a profile with alias(s) is used in function calls
     void ComputeAliasInterprocedural();
     void ComputeInterprocedural();
+
+    void InheritProfile(SliceProfile& sp, std::vector<SliceProfile>::iterator argSliceItr);
     
     void Stage2();
     void Stage3();
@@ -125,7 +130,7 @@ public:
 
 private:
     std::unordered_map<std::string, std::vector<SliceProfile>> profileMap;
-    std::map<size_t, std::vector<CallBlob>> callsMap;
+    std::unordered_map<size_t, ParamSlice> callsMap;
     std::unordered_set <std::string> visited_func;
 
     std::vector<SlicePosition> loopdata;
