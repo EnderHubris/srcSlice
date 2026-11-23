@@ -25,10 +25,10 @@ int main(int argc, char **argv)
     // search for the output flag and set a marker
     std::string inputFile = "", outputFile = "";
     int threadCount = defaultThreads();
+    int iterations = 1;
     std::ofstream outFile;
     bool verboseMode = false, feedbackMode = false,
-        showControlEdges = false, expandCalls = false,
-        expandAliases = false;
+        showControlEdges = false, expandAliases = false;
 
     std::ostringstream ss;
     ss << "Number of concurrent threads [Default " << threadCount << "]";
@@ -41,9 +41,10 @@ int main(int argc, char **argv)
     app.add_option  ("-o, --output",  outputFile,                   "Name of the JSON output file [Stdout is Default]");
     app.add_option  ("-t, --threads", threadCount,                  ss.str())
         ->default_val(threadCount);
-    
+    app.add_option  ("-i, --iterations",  iterations,               "Number of iterations of interprocedural")
+        ->default_val(iterations);
+
     app.add_flag    ("-c, --control-edges", showControlEdges,       "Display Control-Edges of the Slice");
-    app.add_flag    ("-e, --expand-calls", expandCalls,             "Generate more details in cfunction entries");
     app.add_flag    ("-a, --expand-aliases", expandAliases,         "Expand Alias list");
     app.add_flag    ("-v, --verbose", verboseMode,                  "Display Debug Info when Slicing");
     app.add_flag    ("-p, --progress", feedbackMode,                "Display Feedback Progress Bars");
@@ -54,13 +55,20 @@ int main(int argc, char **argv)
         inputFile, outputFile,
         threadCount,
         showControlEdges,
-        expandCalls,
+        iterations,
         expandAliases,
         verboseMode,
         feedbackMode
     };
 
     try {
+        // test if options are of valid value(s)
+        if (threadCount < 1) {
+            throw std::runtime_error("Thread count must be a non-zero positive integer");
+        } else if (iterations < 1) {
+            throw std::runtime_error("Iterations must be a non-zero positive integer");
+        }
+        
         // check if input file exists
         std::ifstream srcmlFile(inputFile);
         if (!srcmlFile.is_open()) {
@@ -69,11 +77,11 @@ int main(int argc, char **argv)
         srcmlFile.close();
 
         if (showControlEdges) {
-            std::cout << "[\033[33mWARNING\033[0m] Computing control-edges may increase the time required to complete the program\n";
+            std::cout << "[\033[33mWARNING\033[0m] Computing control-edges may increase the time required to complete the program" << std::endl;
         }
 
         if (expandAliases) {
-            std::cout << "[\033[33mWARNING\033[0m] Expanding Pointer Aliasing may increase the time required to complete the program\n";
+            std::cout << "[\033[33mWARNING\033[0m] Expanding Pointer Aliasing may increase the time required to complete the program" << std::endl;
         }
 
         SrcSliceHandler srcSliceHandler(info);
@@ -92,7 +100,7 @@ int main(int argc, char **argv)
             std::cout << results;
         }
     } catch (const std::exception& e) {
-        std::cout << "\033[31m" << e.what() << "\033[0m" << "\n";
+        std::cout << "\033[31m" << e.what() << "\033[0m" << std::endl;
         return 3;
     }
 }

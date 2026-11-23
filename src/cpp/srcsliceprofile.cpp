@@ -56,7 +56,6 @@ bool SliceProfile::operator==(const SliceProfile& rhs) const {
     if (isPotentialArray != rhs.isPotentialArray) return false;
     if (ignorePtrRef != rhs.ignorePtrRef) return false;
     if (isFragment != rhs.isFragment) return false;
-    if (expandCalls != rhs.expandCalls) return false;
 
     return true;
 }

@@ -83,7 +83,6 @@ public:
     bool visited = false;
     
     bool showControlEdges = false;
-    bool expandCalls = false;
 
     std::string currentPointerReference;
     bool ignorePtrRef = false;

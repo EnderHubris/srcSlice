@@ -12,7 +12,7 @@
 
 TestArg data = {
     true, // control edges
-    false // cfunc expand
+    false // alias expand
 };
 
 TEST_CASE( TestName("Control-Edge Test"), "[srcslice]" ) {

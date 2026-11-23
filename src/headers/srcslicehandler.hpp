@@ -66,19 +66,15 @@ struct CliInfo {
     std::string outputFile;
     int threadCount;
     bool calculateControlEdges;
-    bool expandCalls;
+    int iterations;
     bool expandAliases;
     bool verboseMode;
     bool progressMode;
 };
 struct TestArg {
     bool calculateControlEdges;
-    bool expandCalls;
     bool expandAliases;
 };
-
-inline size_t cacheMisses = 0;
-inline size_t cacheHits = 0;
 
 class SrcSliceHandler : public srcDispatch::PolicyListener {
 public:
@@ -148,8 +144,9 @@ private:
     bool verboseMode = false;
     bool calculateControlEdges = false;
     bool progressMode = false;
-    bool expandCalls = false;
     bool expandAliases = false;
+
+    int iterations = 1;
 
     std::mutex backlogMutex;
     std::condition_variable backlogCv;

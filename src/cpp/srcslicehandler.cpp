@@ -36,7 +36,7 @@ SrcSliceHandler::SrcSliceHandler(const CliInfo& info) {
     verboseMode = info.verboseMode;
     progressMode = info.progressMode;
     calculateControlEdges = info.calculateControlEdges;
-    expandCalls = info.expandCalls;
+    iterations = info.iterations;
     expandAliases = info.expandAliases;
 
     // if an invalid number is passed default to 1 thread
@@ -94,9 +94,6 @@ SrcSliceHandler::SrcSliceHandler(const CliInfo& info) {
         Stage2();
         Stage3();
     }
-
-    std::cerr << "[!] Cache Hits  : " << cacheHits << "/" << (cacheHits+cacheMisses) << "\n";
-    std::cerr << "[!] Cache Misses: " << cacheMisses << "/" << (cacheHits+cacheMisses) << "\n";
 }
 
 // Use string srcml buffer ctor of srcSAXController
@@ -346,9 +343,6 @@ std::string SrcSliceHandler::Profile2Str(const SliceProfile& profile) const {
                         "\"functionName\":\"" << call.functionName;
                         out << "\",\"parameter\":\"" << call.parameterIndex;
                         out << "\",\"definitionPosition\":" << call.funcPos.StartToString();
-                        if (profile.expandCalls) {
-                            out << ",\"endOfFunction\":" << call.funcPos.EndToString();
-                        }
                         out << ",\"invoke\":" << call.invokePosition.StartToString() <<
                     "}";
 
@@ -643,9 +637,18 @@ void SrcSliceHandler::Stage3() {
 }
 
 void SrcSliceHandler::ComputeInterprocedural() {
-    for (auto& [name, profiles] : profileMap) {
-        for (auto& sp : profiles) {
-            ResolveCalls(sp);
+    for (int i = 0; i < iterations; ++i) {
+        if (progressMode || verboseMode) 
+            std::cout << "[!] Interprocedural-Iteration: " << i+1 << "/" << iterations << "\n";
+        
+        for (auto& [name, profiles] : profileMap) {
+            for (auto& sp : profiles) {
+                // ensure the resolve calls on
+                // other iterations does not
+                // instant-return
+                if (i > 0) sp.visited = false;
+                ResolveCalls(sp);
+            }
         }
     }
 }
@@ -722,7 +725,6 @@ void SrcSliceHandler::ResolveCalls(SliceProfile &sp) {
             auto& paramSlice = paramData.paramSlices[i];
 
             if (!paramSlice.has_value()) {
-                ++cacheMisses;
                 auto funcSigCollection = functionSigMap.find(data.functionName);
 
                 // no func. sig. group found
@@ -811,8 +813,6 @@ void SrcSliceHandler::ResolveCalls(SliceProfile &sp) {
                     continue;
 
                 paramSlice = argSliceItr;
-            } else {
-                ++cacheHits;
             }
 
             auto argSliceItr = paramSlice.value();

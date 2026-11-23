@@ -12,7 +12,6 @@
 
 TestArg data = {
     false,  // control edges
-    false,  // cfunc expand
     true    // alias expand
 };
 
