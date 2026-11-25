@@ -98,7 +98,7 @@ public:
     void ComputeOuterPaths(std::set<std::pair<SlicePosition,SlicePosition>>& controlEdges, std::vector<SlicePosition>& sLines);
     void ComputeExitPaths(std::set<std::pair<SlicePosition,SlicePosition>>& controlEdges, std::vector<SlicePosition>& sLines);
 
-    SliceProfileIterator ArgumentProfile(const std::string& funcName, FunctionSignatureData& funcSig, int paramIndex);
+    std::optional<std::vector<SliceProfile>::iterator> ArgumentProfile(const std::string& funcName, FunctionSignatureData& funcSig, int paramIndex);
 
     // Need to track Aliases we have already read through
     // InterProcedural from the normal call should also be reflected

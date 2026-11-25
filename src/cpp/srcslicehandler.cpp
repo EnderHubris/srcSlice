@@ -435,52 +435,52 @@ std::string SrcSliceHandler::ToJSON(bool strip_hash) const {
 
 
 
-SliceProfileIterator SrcSliceHandler::ArgumentProfile(const std::string& funcName, FunctionSignatureData& funcSig, int paramIndex) {
+std::optional<std::vector<SliceProfile>::iterator> SrcSliceHandler::ArgumentProfile(const std::string& funcName, FunctionSignatureData& funcSig, int paramIndex) {
+    std::optional<std::vector<SliceProfile>::iterator> profile;
+
     if (
         funcSig.parameters.empty() ||
         paramIndex < 0 ||
         paramIndex >= funcSig.parameters.size()
-    ) return profileMap.end();
+    ) return profile;
 
     const auto& target = funcSig.parameters[paramIndex];
-    if (!target || !target->name) return profileMap.end();
+    if (!target || !target->name) return profile;
 
-    auto Spi = profileMap.find(target->name.ToString());
-    for (auto& param : funcSig.parameters) {
-        if (!param) continue;
-        if (!param->name) continue;
-
-        auto argSpi = profileMap.find(param->name.ToString());
-
-        if (argSpi == profileMap.end()) {
-            if (verboseMode) {
-                std::cout << "[-] " << __FUNCTION__ << ":" << __LINE__ << " | Could not find SliceProfile for parameter '"
-                << param->name.ToString() << "' of function '" << funcName << "'" << "\n";
-            }
-            continue;
+    auto sliceGroup = profileMap.find(target->name.ToString());
+    if (sliceGroup == profileMap.end()) {
+        if (verboseMode) {
+            std::cout << "[-] " << __FUNCTION__ << ":" << __LINE__ << " | Could not find SliceProfile for parameter '"
+            << target->name.ToString() << "' of function '" << funcName << "'" << "\n";
         }
-
-        for (SliceProfile& profile : argSpi->second) {
-            // attempt to finger-print based on contained file
-            if (profile.file != funcSig.currentFilePath)
-                continue;
-
-            // attempt to finger-print based on decl position
-            SlicePosition paramPos(
-                funcSig.parameters.at(paramIndex)->name->startPosition,
-                funcSig.parameters.at(paramIndex)->name->endPosition,
-                funcSig.currentFilePath
-            );
-            if (profile.declPosition != paramPos)
-                continue;
-
-            if (profile.visited) return Spi;
-
-            ResolveCalls(profile);
-        }
+        return profile;
     }
 
-    return Spi;
+    for (
+        auto spi = sliceGroup->second.begin();
+        spi != sliceGroup->second.end();
+        ++spi
+    ) {
+        // attempt to finger-print based on contained file
+        if (spi->file != funcSig.currentFilePath)
+            continue;
+
+        // attempt to finger-print based on decl position
+        SlicePosition paramPos(
+            funcSig.parameters.at(paramIndex)->name->startPosition,
+            funcSig.parameters.at(paramIndex)->name->endPosition,
+            funcSig.currentFilePath
+        );
+        if (spi->declPosition != paramPos)
+            continue;
+
+        profile = spi;
+        if (spi->visited) return profile;
+        ResolveCalls(*spi);
+        break;
+    }
+
+    return profile;
 }
 
 
@@ -735,25 +735,23 @@ void SrcSliceHandler::ResolveCalls(SliceProfile &sp) {
                     }
                     continue;
                 }
-        
-                size_t sigIndex = 0;
                 
                 // Attempt to fingerprint the right signature based on
                 // function call definition line and called function
                 // def line data
-                for (sigIndex = 0; sigIndex < funcSigCollection->second.size(); ++sigIndex) {
-                    if (data.funcPos == funcSigCollection->second[sigIndex].position) {
-                        break;
+                auto funcItr = std::find_if(
+                    funcSigCollection->second.begin(),
+                    funcSigCollection->second.end(),
+                    [&data](const FunctionSignatureData& sig) {
+                        return !sig.name.empty() &&
+                               !sig.parameters.empty() &&
+                               data.funcPos == sig.position;
                     }
-                }
+                );
         
-                if (sigIndex >= funcSigCollection->second.size()) continue;
+                if (funcItr == funcSigCollection->second.end()) continue;
         
-                if (funcSigCollection->second[sigIndex].name.empty()) {
-                    continue; // the name is not usable in computation
-                }
-        
-                std::string simpleFunctionName = SrcSliceOperations::GetSimpleFunctionName(funcSigCollection->second[sigIndex].name);
+                std::string simpleFunctionName = SrcSliceOperations::GetSimpleFunctionName(funcItr->name);
         
                 unsigned int ArgProfParam = data.parameterIndex - 1;
         
@@ -762,57 +760,30 @@ void SrcSliceHandler::ResolveCalls(SliceProfile &sp) {
                 /*** @todo look for potential issues with overload case */
         
                 bool matchingName = data.functionName == simpleFunctionName;
-                bool containsParameters = !funcSigCollection->second[sigIndex].parameters.empty();
-                bool validSigIndex = sigIndex < funcSigCollection->second.size();
-                bool validArgIndex = ArgProfParam < funcSigCollection->second[sigIndex].parameters.size();
+                bool validArgIndex = ArgProfParam < funcItr->parameters.size();
         
-                if (!matchingName || !containsParameters || !validSigIndex || !validArgIndex) {
+                if (!matchingName || !validArgIndex) {
                     continue;
                 }
         
-                if (!funcSigCollection->second[sigIndex].parameters[ArgProfParam]->name) {
+                if (!funcItr->parameters[ArgProfParam]->name) {
                     continue;
                 }
         
                 // Only run this section if the parameter name can be extracted
-                auto argProfileGroup = ArgumentProfile(
+                paramSlice = ArgumentProfile(
                     data.functionName,
-                    funcSigCollection->second[sigIndex],
+                    *funcItr,
                     ArgProfParam
                 );
         
-                if (argProfileGroup == profileMap.end()) {
+                if (!paramSlice.has_value()) {
                     if (verboseMode) {
                         std::cout << "[-] " << __FUNCTION__ << ":" << __LINE__ << " | ArgumentProfile could not resolve SliceProfile for Call '"
                         << data.functionName << "[" << ArgProfParam << "]" << "'" << "\n";
                     }
                     continue;
                 }
-        
-                auto argSliceItr = argProfileGroup->second.begin();
-                for (argSliceItr = argProfileGroup->second.begin(); argSliceItr != argProfileGroup->second.end(); ++argSliceItr) {
-                    if (!argSliceItr->containsDeclaration)
-                        continue;
-                    if (SrcSliceOperations::GetSimpleFunctionName(argSliceItr->function) != data.functionName)
-                        continue;
-        
-                    auto paramDecl = funcSigCollection->second[sigIndex].parameters[ArgProfParam];
-                    SlicePosition paramDeclPos(
-                        paramDecl->name->startPosition,
-                        paramDecl->name->endPosition,
-                        funcSigCollection->second[sigIndex].currentFilePath
-                    );
-        
-                    // potential match found for parameter slice associated with argument (sp)
-                    if (argSliceItr->declPosition == paramDeclPos) {
-                        break;
-                    }
-                }
-        
-                if (argSliceItr == argProfileGroup->second.end())
-                    continue;
-
-                paramSlice = argSliceItr;
             }
 
             auto argSliceItr = paramSlice.value();
