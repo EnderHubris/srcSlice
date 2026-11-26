@@ -90,6 +90,9 @@ public:
 
     void NotifyWrite(const srcDispatch::PolicyDispatcher *policy [[maybe_unused]], srcDispatch::srcSAXEventContext &ctx [[maybe_unused]]) {};
 
+    void ToJSON(std::ostream& out, bool strip_hash = false) const;
+
+private:
     /*
         srcSlice focuses on Forward-Slicing, therefor our Control-Flows are going to be forward-flowing
         we are not focusing on backwards-flows.
@@ -121,10 +124,9 @@ public:
     // merge the workers sub-structure into the main-structure in the handler
     void consumeWorker(SrcSliceWorker* worker);
 
-    std::string Profile2Str(const SliceProfile& profile) const;
-    void ToJSON(std::ostream& out, bool strip_hash = false) const;
+    void WriteProfile(std::ostream& out, const SliceProfile& profile) const;
+    
 
-private:
     std::unordered_map<std::string, std::vector<SliceProfile>> profileMap;
     std::unordered_map<size_t, ParamSlice> callsMap;
     std::unordered_set <std::string> visited_func;

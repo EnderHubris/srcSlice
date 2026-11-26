@@ -281,9 +281,7 @@ void SrcSliceHandler::ManageThreads() {
 
 
 
-std::string SrcSliceHandler::Profile2Str(const SliceProfile& profile) const {
-    std::ostringstream out;
-
+void SrcSliceHandler::WriteProfile(std::ostream& out, const SliceProfile& profile) const {
     out << "    \"file\":\"" << profile.file << "\"," << "\n";
     out << "    \"language\":\"" << profile.language << "\"," << "\n";
     
@@ -393,8 +391,6 @@ std::string SrcSliceHandler::Profile2Str(const SliceProfile& profile) const {
     } else {
         out << "]" << "\n";
     }
-
-    return out.str();
 }
 
 void SrcSliceHandler::ToJSON(std::ostream& out, bool strip_hash) const {
@@ -402,7 +398,7 @@ void SrcSliceHandler::ToJSON(std::ostream& out, bool strip_hash) const {
 
     // start of JSON obj
     out << "{\n";
-    
+
     for (auto& profiles : profileMap) {
         for (auto& slice : profiles.second) {
             if (!slice.containsDeclaration)
@@ -417,7 +413,8 @@ void SrcSliceHandler::ToJSON(std::ostream& out, bool strip_hash) const {
             std::string profileIdentifier = (strip_hash) ? slice.shortKey() : slice.jsonKey();
 
             out << "\"" << profileIdentifier << "\":{\n";
-            out << Profile2Str(slice);
+            // stream the profile into the ostream ref.
+            WriteProfile(out, slice);
             out << "}";
         }
     }
