@@ -84,7 +84,9 @@ std::string StringsToArchive(std::vector<std::string> contents, std::vector<std:
 
 std::string RunSrcSlice(std::string srcml, const TestArg& info) {
     SrcSliceHandler srcSliceHandler(srcml, info);
-    return srcSliceHandler.ToJSON(true);
+    std::ostringstream results;
+    srcSliceHandler.ToJSON(results, true);
+    return results.str();
 }
 
 std::string FetchSlices(std::string cppSource) {

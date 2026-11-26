@@ -122,7 +122,7 @@ public:
     void consumeWorker(SrcSliceWorker* worker);
 
     std::string Profile2Str(const SliceProfile& profile) const;
-    std::string ToJSON(bool strip_hash = false) const;
+    void ToJSON(std::ostream& out, bool strip_hash = false) const;
 
 private:
     std::unordered_map<std::string, std::vector<SliceProfile>> profileMap;

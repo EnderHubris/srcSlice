@@ -85,19 +85,18 @@ int main(int argc, char **argv)
         }
 
         SrcSliceHandler srcSliceHandler(info);
-        std::string results = srcSliceHandler.ToJSON();
 
         // write to either stdout or output file
         if (!outputFile.empty()) {
             // allow output file to be written in
             outFile = std::ofstream(outputFile);
             std::cout << "Writing to :: " << outputFile << "\n";
-            outFile << results;
+            srcSliceHandler.ToJSON(outFile);
             std::cout << "Output Saved to :: " << outputFile << "\n";
             outFile.close();
         } else {
             // write to stdout
-            std::cout << results;
+            srcSliceHandler.ToJSON(std::cout);
         }
     } catch (const std::exception& e) {
         std::cout << "\033[31m" << e.what() << "\033[0m" << std::endl;

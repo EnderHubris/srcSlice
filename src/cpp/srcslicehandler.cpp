@@ -397,40 +397,33 @@ std::string SrcSliceHandler::Profile2Str(const SliceProfile& profile) const {
     return out.str();
 }
 
-std::string SrcSliceHandler::ToJSON(bool strip_hash) const {
-    std::ostringstream sliceOutput;
+void SrcSliceHandler::ToJSON(std::ostream& out, bool strip_hash) const {
+    bool firstWrite = true;
 
-    sliceOutput << "{\n";
-    bool writtenSlices = false;
-
+    // start of JSON obj
+    out << "{\n";
+    
     for (auto& profiles : profileMap) {
         for (auto& slice : profiles.second) {
             if (!slice.containsDeclaration)
                 continue;
 
-            writtenSlices = true;
+            if (!firstWrite)
+                out << ",\n";
+            firstWrite = false;
+
             std::string name(slice.variableName + '-' + slice.declPosition.ToNameString() + '-' + slice.checksum);
 
             std::string profileIdentifier = (strip_hash) ? slice.shortKey() : slice.jsonKey();
 
-            sliceOutput << "\"" << profileIdentifier << "\":{\n";
-            sliceOutput << Profile2Str(slice);
-            sliceOutput << "},\n";
+            out << "\"" << profileIdentifier << "\":{\n";
+            out << Profile2Str(slice);
+            out << "}";
         }
     }
 
-    // remove trailing comma
-    std::string stream2string = sliceOutput.str();
-    sliceOutput.clear();
-
-    // remove trailing comma
-    if (writtenSlices) {
-        stream2string.resize(stream2string.length() - 2);
-    }
-
-    // closing of the entire JSON object
-    stream2string += "\n}";
-    return stream2string;
+    // end of JSON obj
+    out << "\n}";
 }
 
 
